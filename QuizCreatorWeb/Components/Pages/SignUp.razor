@@ -1,0 +1,60 @@
+﻿@page "/signup"
+@using QuizCreatorWeb.Data
+@using QuizCreatorWeb.Data.Dto
+@inject AuthService AuthenticationService
+@inject NavigationManager NavigationManager
+
+<PageTitle>SignUp</PageTitle>
+
+<h1 class="text-center my-4">Sign Up</h1>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <EditForm Model="Model" OnValidSubmit="HandleValidSubmit" FormName="SignUpForm">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger" />
+                <div class="mb-3">
+                    <label class="form-label">Name:</label>
+                    <InputText @bind-Value="Model.UserName" class="form-control" />
+                    <ValidationMessage For="() => Model.UserName" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Email:</label>
+                    <InputText @bind-Value="Model.Email" type="email" class="form-control" />
+                    <ValidationMessage For="() => Model.Email" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Password:</label>
+                    <InputText @bind-Value="Model.Password" type="password" class="form-control" />
+                    <ValidationMessage For="() => Model.Password" />
+                </div>
+                <div class="text-danger">@errorMessage</div>
+                <button type="submit" class="btn btn-primary w-100">Sign Up</button>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    public SignUpDto Model { get; set; } = new();
+
+    private string? errorMessage;
+
+    private async Task HandleValidSubmit()
+    {
+        if (await AuthenticationService.SignUp(
+            Model.Email,
+            Model.Password,
+            Model.UserName
+        ))
+        {
+            NavigationManager.NavigateTo("/signin");
+        }
+        else
+        {
+            errorMessage = "Sign up failed. Please try again.";
+        }
+    }
+}

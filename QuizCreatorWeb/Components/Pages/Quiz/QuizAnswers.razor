@@ -1,0 +1,131 @@
+﻿@page "/quiz-answers/{quizCompletionId:int}"
+@using QuizCreatorWeb.Data.Dto
+@using QuizCreatorWeb.Data
+@using QuizCreatorWeb.Models
+@inject UserQuizService UserQuizService
+@inject QuestionService QuestionService
+@rendermode InteractiveServer
+
+<h3>Quiz Answers</h3>
+
+@if (Model == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    @foreach (var question in Model)
+    {
+        <div class="question-container mb-3">
+            <h5>@question.QuestionText</h5>
+
+            @if (question.QuestionTypeId == 1)
+            {
+                <ul>
+                    @foreach (var option in question.SingleChoiceOptions ?? new List<SingleChoiceOptionDto>())
+                    {
+                        <li style="color: @(GetOptionColor(option.IsCorrect, option.OptionText == question.UserAnswer))">
+                            <input type="radio" disabled
+                                   name="single-choice-@question.QuestionId"
+                                   checked="@option.OptionText == question.UserAnswer" />
+                            @option.OptionText
+                        </li>
+                    }
+                </ul>
+            }
+            else if (question.QuestionTypeId == 2)
+            {
+                <ul>
+                    @foreach (var option in question.MultipleChoiceOptions ?? new List<MultipleChoiceOptionDto>())
+                    {
+                        <li style="color: @(GetOptionColor(option.IsCorrect, question.UserAnswers.Contains(option.OptionText)))">
+                            <input type="checkbox" disabled
+                                   checked="@question.UserAnswers.Contains(option.OptionText)" />
+                            @option.OptionText
+                        </li>
+                    }
+                </ul>
+            }
+            else if (question.QuestionTypeId == 3)
+            {
+                <div class="free-text-answer" style="color: @(question.UserAnswer == question.CorrectAnswer ? "green" : "red")">
+                    @question.UserAnswer
+                </div>
+                <div class="correct-answer text-muted">
+                    <strong>Correct Answer:</strong> @question.CorrectAnswer
+                </div>
+            }
+        </div>
+    }
+
+}
+
+@code {
+    [Parameter]
+    public int QuizCompletionId { get; set; }
+
+    private List<QuizAnswersModel>? Model = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var userAnswers = await UserQuizService.GetUserAnswersByCompletionId(QuizCompletionId);
+
+            var questionIds = userAnswers.Select(a => a.QuestionId).Distinct().ToList();
+            var questions = new List<QuestionDto>();
+            foreach (var questionId in questionIds)
+            {
+                questions.Add(await QuestionService.GetQuestion(questionId));
+            }
+
+            Model = questions.Select(q => new QuizAnswersModel
+            {
+                QuestionId = q.Id,
+                QuestionText = q.QuestionText,
+                QuestionTypeId = q.QuestionTypeId,
+                SingleChoiceOptions = q.SingleChoiceOptions,
+                MultipleChoiceOptions = q.MultipleChoiceOptions,
+                CorrectAnswer = GetCorrectAnswer(q),
+                UserAnswer = q.QuestionTypeId == 1 || q.QuestionTypeId == 3
+                    ? userAnswers.FirstOrDefault(a => a.QuestionId == q.Id)?.Answer
+                    : null,
+                UserAnswers = q.QuestionTypeId == 2
+                    ? userAnswers.Where(a => a.QuestionId == q.Id).Select(a => a.Answer).ToList()
+                    : null
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to load quiz answers: {ex.Message}");
+        }
+    }
+
+    private string GetCorrectAnswer(QuestionDto question)
+    {
+        return question.QuestionTypeId switch
+        {
+            1 => question.SingleChoiceOptions?.FirstOrDefault(o => o.IsCorrect)?.OptionText ?? "N/A",
+            2 => string.Join(", ", question.MultipleChoiceOptions?.Where(o => o.IsCorrect).Select(o => o.OptionText) ?? new List<string>()),
+            3 => question.FreeText?.CorrectAnswer ?? "N/A",
+            _ => "N/A"
+        };
+    }
+
+    private string GetOptionColor(bool isCorrect, bool isSelected)
+    {
+        if (isSelected && isCorrect)
+        {
+            return "green";
+        }
+        else if (isSelected && !isCorrect)
+        {
+            return "red";
+        }
+        else if (!isSelected && isCorrect)
+        {
+            return "orange";
+        }
+        return "black";
+    }
+}

@@ -1,0 +1,179 @@
+﻿@page "/fill-quiz/{quizId:int}"
+@using QuizCreatorWeb.Data
+@using QuizCreatorWeb.Data.Dto
+@using QuizCreatorWeb.Models
+@inject QuizService QuizService
+@inject QuestionService QuestionService
+@inject UserQuizService UserQuizService
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<h3>Fill Quiz</h3>
+
+@if (QuizModel == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <EditForm Model="QuizModel" OnValidSubmit="SubmitAnswers">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        @foreach (var question in QuizModel.Questions)
+        {
+            <div class="question-container mb-3">
+                <h5>@question.QuestionText</h5>
+
+                @if (question.QuestionTypeId == 1)
+                    {
+                    <InputRadioGroup @bind-Value="question.SelectedSingleChoice">
+                        @foreach (var option in question.SingleChoiceOptions)
+                        {
+                            <div>
+                                <InputRadio Value="@option.OptionText" />
+                                <label>@option.OptionText</label>
+                            </div>
+                        }
+                    </InputRadioGroup>
+                    }
+                else if (question.QuestionTypeId == 2)
+                    {
+                    @foreach (var selection in question.MultipleChoiceSelections)
+                    {
+                        <div>
+                            <label>
+                                <InputCheckbox @bind-Value="selection.IsSelected" />
+                                @selection.OptionText
+                            </label>
+                        </div>
+                    }
+                }
+                else if (question.QuestionTypeId == 3)
+                {
+                <InputText @bind-Value="question.FreeTextAnswer" class="form-control" />
+                }
+            </div>
+        }
+
+        <button type="submit" class="btn btn-primary">Submit Answers</button>
+    </EditForm>
+}
+
+@code {
+    [Parameter]
+    public int QuizId { get; set; }
+
+    [SupplyParameterFromForm]
+    private QuizFillModel QuizModel {get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var questions = await QuestionService.GetQuestionsByQuizId(QuizId);
+            QuizModel = new QuizFillModel
+                {
+                    QuizId = QuizId,
+                    Questions = questions.Select(q => new QuestionAnswerModel
+                    {
+                        QuestionId = q.Id,
+                        QuestionText = q.QuestionText,
+                        QuestionTypeId = q.QuestionTypeId,
+                        SingleChoiceOptions = q.SingleChoiceOptions,
+                        MultipleChoiceOptions = q.MultipleChoiceOptions,
+                        MultipleChoiceSelections = q.MultipleChoiceOptions?.Select(option => new MultipleChoiceOptionSelection
+                        {
+                            OptionText = option.OptionText,
+                            IsSelected = false
+                        }).ToList() ?? new List<MultipleChoiceOptionSelection>()
+                    }).ToList()
+                };
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to load questions: {ex.Message}");
+        }
+    }
+
+    private async Task SubmitAnswers()
+    {
+        try
+        {
+            // Létrehozunk egy UserQuizCompletionDto-t
+            var completionDto = new UserQuizCompletionDto
+                {
+                    QuizId = QuizModel.QuizId,
+                    CompletionDate = DateTime.UtcNow
+                };
+
+            var createdCompletion = await UserQuizService.CreateQuizCompletion(completionDto);
+            if (createdCompletion == null)
+            {
+                throw new Exception("Failed to create quiz completion.");
+            }
+
+            // Beküldjük a válaszokat
+            foreach (var question in QuizModel.Questions)
+            {
+                if (question.QuestionTypeId == 1) // Single Choice
+                {
+                    var userAnswerDto = new UserQuizAnswerDto
+                        {
+                            QuizCompletionId = createdCompletion.Id,
+                            QuestionId = question.QuestionId,
+                            Answer = question.SelectedSingleChoice,
+                            SubmittedDate = DateTime.UtcNow
+                        };
+
+                    var response = await UserQuizService.SaveUserAnswer(userAnswerDto);
+                    if (!response)
+                    {
+                        throw new Exception("Failed to submit.");
+                    }
+                }
+                else if (question.QuestionTypeId == 2) // Multiple Choice
+                {
+                    foreach (var selection in question.MultipleChoiceSelections.Where(s => s.IsSelected))
+                    {
+                        var userAnswerDto = new UserQuizAnswerDto
+                            {
+                                QuizCompletionId = createdCompletion.Id,
+                                QuestionId = question.QuestionId,
+                                Answer = selection.OptionText,
+                                SubmittedDate = DateTime.UtcNow
+                            };
+
+                        var response = await UserQuizService.SaveUserAnswer(userAnswerDto);
+                        if (!response)
+                        {
+                            throw new Exception("Failed to submit.");
+                        }
+                    }
+                }
+                else if (question.QuestionTypeId == 3) // Free Text
+                {
+                    var userAnswerDto = new UserQuizAnswerDto
+                        {
+                            QuizCompletionId = createdCompletion.Id,
+                            QuestionId = question.QuestionId,
+                            Answer = question.FreeTextAnswer,
+                            SubmittedDate = DateTime.UtcNow
+                        };
+
+                    var response = await UserQuizService.SaveUserAnswer(userAnswerDto);
+                    if (!response)
+                    {
+                        throw new Exception("Failed to submit.");
+                    }
+                }
+            }
+
+            NavigationManager.NavigateTo("/");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+}

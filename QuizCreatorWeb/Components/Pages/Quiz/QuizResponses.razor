@@ -1,0 +1,66 @@
+﻿@page "/quiz-responses/{quizId:int}"
+@using QuizCreatorWeb.Data.Dto
+@using QuizCreatorWeb.Data
+@using QuizCreatorWeb.Models
+@inject UserQuizService UserQuizService
+@inject UserService UserService
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<h3>Quiz Responses</h3>
+
+@if (Model == null)
+{
+    <p>Loading...</p>
+}
+else if (!Model.Any())
+{
+    <p>No responses have been submitted for this quiz yet.</p>
+}
+else
+{
+    <div class="quiz-container">
+        @foreach (var completion in Model)
+        {
+            <div class="quiz-card">
+                <div class="quiz-info">
+                    <strong>@completion.UserName</strong>
+                    <p>@completion.UserQuizCompletion.CompletionDate.ToString("g")</p>
+                </div>
+                <button class="view-button" @onclick="() => NavigateToAnswers(completion.UserQuizCompletion.Id)">View</button>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int QuizId { get; set; }
+
+    private List<QuizCompletionModel>? Model = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var userQuizCompletions = await UserQuizService.GetQuizCompletions(QuizId);
+            foreach (var completion in userQuizCompletions)
+            {
+                Model.Add(new QuizCompletionModel()
+                {
+                        UserQuizCompletion = completion,
+                        UserName = await UserService.GetUserName(completion.UserId) ?? "",
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to load responses: {ex.Message}");
+        }
+    }
+
+    private void NavigateToAnswers(int completionId)
+    {
+        NavigationManager.NavigateTo($"/quiz-answers/{completionId}");
+    }
+}

@@ -1,0 +1,28 @@
+﻿@page "/signout"
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
+@using QuizCreatorWeb.Data
+@inject NavigationManager NavigationManager
+
+<div>
+    <h1 class="text-center my-4">Sign Out</h1>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <p class="lead text-center">You have been signed out successfully.</p>
+                <p class="text-center">Thank you for using our service!</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter]
+    public HttpContext? HttpContext { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await HttpContext!.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        NavigationManager.NavigateTo("/signin", true);
+    }
+}

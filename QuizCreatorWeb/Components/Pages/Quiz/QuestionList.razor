@@ -1,0 +1,58 @@
+﻿@page "/questions-list/{quizId:int}"
+@using QuizCreatorWeb.Data
+@using QuizCreatorWeb.Data.Dto
+@inject NavigationManager NavigationManager
+@inject QuestionService QuestionService
+@inject QuizService QuizService
+@rendermode InteractiveServer
+
+<h3>Questions</h3>
+
+@if (Model == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <div class="question-list">
+        @foreach (var question in Model)
+        {
+            <div class="question-card">
+                <div class="question-text">
+                    @question.QuestionText
+                </div>
+                <div class="question-actions">
+                    <button class="btn edit-button" @onclick="() => EditQuestion(question.Id)">Edit</button>
+                    <button class="btn delete-button" @onclick="() => RemoveQuestion(question.Id)">Remove</button>
+                </div>
+            </div>
+        }
+    </div>
+    <button class="btn btn-primary" @onclick="AddQuestion">Add Question</button>
+}
+
+@code {
+    [Parameter] public int QuizId { get; set; }
+    private List<QuestionDto> Model { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Model = await QuestionService.GetQuestionsByQuizId(QuizId);
+    }
+
+    private void EditQuestion(int questionId)
+    {
+        NavigationManager.NavigateTo($"/edit-question/{QuizId}/{questionId}");
+    }
+
+    private void AddQuestion()
+    {
+        NavigationManager.NavigateTo($"/edit-question/{QuizId}/0");
+    }
+
+    private async Task RemoveQuestion(int questionId)
+    {
+        await QuestionService.DeleteQuestion(questionId);
+        Model = await QuestionService.GetQuestionsByQuizId(QuizId);
+    }
+}

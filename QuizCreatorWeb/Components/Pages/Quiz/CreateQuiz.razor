@@ -1,0 +1,37 @@
+﻿@page "/create-quiz"
+@using QuizCreatorWeb.Data
+@using QuizCreatorWeb.Data.Dto
+@inject NavigationManager NavigationManager
+@inject QuizService QuizService
+@rendermode InteractiveServer
+
+<h3>Create a New Quiz</h3>
+
+<EditForm Model="QuizEntity" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div>
+        <label>Quiz Title:</label>
+        <InputText @bind-Value="QuizEntity.Title" class="form-control" />
+    </div>
+    <div>
+        <label>Description:</label>
+        <InputText @bind-Value="QuizEntity.Description" class="form-control" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">Create</button>
+</EditForm>
+
+@code {
+    private QuizDto QuizEntity { get; set; } = new QuizDto();
+
+    private async Task HandleValidSubmit()
+    {
+        var createdQuiz = await QuizService.CreateQuiz(QuizEntity);
+        if (createdQuiz != null)
+        {
+            NavigationManager.NavigateTo($"/questions-list/{createdQuiz.Id}");
+        }
+    }
+}

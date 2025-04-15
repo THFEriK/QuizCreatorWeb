@@ -1,0 +1,146 @@
+﻿@page "/edit-question/{quizId:int}/{questionId:int}"
+@using QuizCreatorWeb.Data
+@using QuizCreatorWeb.Data.Dto
+@inject NavigationManager NavigationManager
+@inject QuizService QuizService
+@inject QuestionService QuestionService
+@rendermode InteractiveServer
+
+<h3>Edit Question</h3>
+
+<EditForm Model="Model" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div>
+        <label>Question Text:</label>
+        <InputText @bind-Value="Model.QuestionText" class="form-control" />
+    </div>
+    <div>
+        <label>Question Type:</label>
+        <select class="form-control" @bind="Model.QuestionTypeId">
+            <option value="">-- Select Question Type --</option>
+            <option value="1">Single Choice</option>
+            <option value="2">Multiple Choice</option>
+            <option value="3">Free Text</option>
+        </select>
+    </div>
+
+    @if (Model.QuestionTypeId == 1)
+    {
+        <h5>Checkbox Options</h5>
+        @if (Model.SingleChoiceOptions != null)
+        {
+            @foreach (var option in Model.SingleChoiceOptions)
+            {
+                <div>
+                    <label>Option Text:</label>
+                    <InputText @bind-Value="option.OptionText" class="form-control" />
+                    <label>Is Correct:</label>
+                    <InputCheckbox @bind-Value="option.IsCorrect" />
+                    <button type="button" class="btn btn-danger" @onclick="() => RemoveCheckboxOption(option)">Remove</button>
+                </div>
+            }
+        }
+        <button type="button" class="btn btn-secondary" @onclick="AddCheckboxOption">Add Option</button>
+    }
+    else if (Model.QuestionTypeId == 2)
+    {
+        <h5>Multiple Choice Options</h5>
+        @if (Model.MultipleChoiceOptions != null)
+        {
+            @foreach (var option in Model.MultipleChoiceOptions)
+            {
+                <div>
+                    <label>Option Text:</label>
+                    <InputText @bind-Value="option.OptionText" class="form-control" />
+                    <label>Is Correct:</label>
+                    <InputCheckbox @bind-Value="option.IsCorrect" />
+                    <button type="button" class="btn btn-danger" @onclick="() => RemoveMultipleChoiceOption(option)">Remove</button>
+                </div>
+            }
+        }
+        <button type="button" class="btn btn-secondary" @onclick="AddMultipleChoiceOption">Add Option</button>
+    }
+    else if (Model.QuestionTypeId == 3)
+    {
+        <h5>Text Answer</h5>
+        <div>
+            <label>Correct Answer:</label>
+            <InputText @bind-Value="Model.FreeText.CorrectAnswer" class="form-control" />
+        </div>
+    }
+
+    <button type="submit" class="btn btn-primary">Save</button>
+    <button type="button" class="btn btn-secondary" @onclick="GoBack">Back</button>
+</EditForm>
+
+@code {
+    [Parameter] public int QuizId { get; set; }
+    [Parameter] public int QuestionId { get; set; }
+    [SupplyParameterFromForm]
+    private QuestionDto Model { get; set; } = new QuestionDto();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (QuestionId != 0)
+        {
+            Model = await QuestionService.GetQuestion(QuestionId);
+        }
+        else
+        {
+            Model.QuizId = QuizId;
+        }
+
+        if (Model.MultipleChoiceOptions == null)
+        {
+            Model.MultipleChoiceOptions = new();
+        }
+        if (Model.SingleChoiceOptions == null)
+        {
+            Model.SingleChoiceOptions = new();
+        }
+        if (Model.FreeText == null)
+        {
+            Model.FreeText = new FreeTextDto();
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (QuestionId == 0)
+        {
+            await QuestionService.CreateQuestion(Model);
+        }
+        else
+        {
+            await QuestionService.UpdateQuestion(Model);
+        }
+        NavigationManager.NavigateTo($"/questions-list/{QuizId}");
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo($"/questions-list/{QuizId}");
+    }
+
+    private void AddMultipleChoiceOption()
+    {
+        Model.MultipleChoiceOptions.Add(new MultipleChoiceOptionDto());
+    }
+
+    private void RemoveMultipleChoiceOption(MultipleChoiceOptionDto option)
+    {
+        Model.MultipleChoiceOptions.Remove(option);
+    }
+
+    private void AddCheckboxOption()
+    {
+        Model.SingleChoiceOptions.Add(new SingleChoiceOptionDto());
+    }
+
+    private void RemoveCheckboxOption(SingleChoiceOptionDto option)
+    {
+        Model.SingleChoiceOptions.Remove(option);
+    }
+}

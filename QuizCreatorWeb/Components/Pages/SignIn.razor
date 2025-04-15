@@ -1,0 +1,88 @@
+﻿@page "/signin"
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
+@using QuizCreatorWeb.Data
+@using QuizCreatorWeb.Data.Dto
+@inject AuthService AuthenticationService
+@inject HttpClient HttpClient
+@inject NavigationManager NavigationManager
+
+
+<PageTitle>SignIn</PageTitle>
+
+<h1 class="text-center my-4">Sign In</h1>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <EditForm Model="Model" OnValidSubmit="HandleValidSubmit" FormName="SignInForm">
+                <DataAnnotationsValidator />
+
+                <div class="mb-3">
+                    <label class="form-label">Email:</label>
+                    <InputText @bind-Value="Model.Email" class="form-control" />
+                    <ValidationMessage For="() => Model.Email" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Password:</label>
+                    <InputText @bind-Value="Model.Password" type="password" class="form-control" />
+                    <ValidationMessage For="() => Model.Password" />
+                </div>
+                <div class="text-danger">@errorMessage</div>
+                <button type="submit" class="btn btn-primary w-100">Sign In</button>
+            </EditForm>
+            <div class="text-center mt-3">
+                <a href="/signup" class="btn btn-secondary w-100">Sign Up</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter]
+    public HttpContext? HttpContext { get; set; }
+
+    [SupplyParameterFromForm]
+    public SignInDto Model { get; set; } = new();
+
+    private string? errorMessage;
+
+    private async Task HandleValidSubmit()
+    {
+        if (string.IsNullOrWhiteSpace(Model.Email) || string.IsNullOrWhiteSpace(Model.Password))
+        {
+            errorMessage = "Invalid Email or Password";
+            return;
+        }
+
+        var signInResponse = await AuthenticationService.SignInAsync(Model);
+        if (signInResponse != null)
+        {
+            HttpContext!.Response.Cookies.Append("JwtToken", signInResponse.Token, new CookieOptions
+            {
+                //HttpOnly = true,
+                //Secure = true,
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTime.UtcNow.AddDays(1)
+            });
+
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Name, signInResponse.User.UserName),
+                new Claim(ClaimTypes.Role, signInResponse.User.IsAdmin ? "Admin" : "User")
+            };
+            var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            var claimsPrincipal = new ClaimsPrincipal(claimsIdentity);
+            var authenticationProperties = new AuthenticationProperties
+                {
+                    IsPersistent = true,
+                    ExpiresUtc = DateTime.UtcNow.AddDays(1)
+                };
+
+            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, claimsPrincipal, authenticationProperties);
+
+            NavigationManager.NavigateTo("/");
+        }
+    }
+}
