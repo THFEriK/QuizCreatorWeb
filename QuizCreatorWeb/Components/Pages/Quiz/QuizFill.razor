@@ -27,7 +27,7 @@ else
 
                 @if (question.QuestionTypeId == 1)
                     {
-                    <InputRadioGroup @bind-Value="question.SelectedSingleChoice">
+                    <InputRadioGroup @bind-Value="question.SelectedSingleChoice" Name="@($"question-{question.QuestionId}")">
                         @foreach (var option in question.SingleChoiceOptions)
                         {
                             <div>
